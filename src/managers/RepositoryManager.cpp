@@ -19,6 +19,7 @@ constexpr char kIndexFilePath[] = ".novagit/index";
 RepositoryManager::RepositoryManager()
     : indexManager{},
       commitManager{},
+      blobManager{},
       headManager{},
       index{} {
     if (repositoryExists()) {
@@ -111,4 +112,56 @@ bool RepositoryManager::commit(
 
 void RepositoryManager::status() const {
     indexManager.displayStagedFiles(index);
+}
+
+void RepositoryManager::log() const {
+    std::string currentCommitID = headManager.getCurrentCommitID();
+
+    while (!currentCommitID.empty()) {
+        Commit commit = commitManager.loadCommit(currentCommitID);
+
+        commitManager.displayCommit(commit);
+
+        currentCommitID = commit.getParentCommitID();
+    }
+}
+
+bool RepositoryManager::checkout(
+    const std::string& commitID
+) {
+    if (!commitManager.commitExists(commitID)) {
+        return false;
+    }
+
+    Commit commit = commitManager.loadCommit(commitID);
+
+    const std::vector<BlobReference>& blobs = commit.getBlobs();
+
+    for (const BlobReference& reference : blobs) {
+        Blob blob = blobManager.loadBlob(reference.blobHash);
+
+        if (blob.getHash().empty()) {
+            return false;
+        }
+
+        std::ofstream out(reference.filename, std::ios::out | std::ios::trunc);
+
+        if (!out) {
+            return false;
+        }
+
+        out << blob.getContent();
+
+        if (!out.good()) {
+            return false;
+        }
+    }
+
+    if (!headManager.updateHEAD(commitID)) {
+        return false;
+    }
+
+    indexManager.clearIndex(index);
+
+    return true;
 }

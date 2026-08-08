@@ -23,6 +23,10 @@ public:
         const std::string& hash
     ) const;
 
+    Blob loadBlob(
+        const std::string& hash
+    ) const;
+
 private:
     HashManager hashManager;
 };

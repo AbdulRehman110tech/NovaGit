@@ -4,6 +4,7 @@
 
 #include "managers/IndexManager.h"
 #include "managers/CommitManager.h"
+#include "managers/BlobManager.h"
 #include "managers/HeadManager.h"
 
 #include "models/Index.h"
@@ -15,6 +16,8 @@ private:
     IndexManager indexManager;
 
     CommitManager commitManager;
+
+    BlobManager blobManager;
 
     HeadManager headManager;
 
@@ -38,4 +41,10 @@ public:
     );
 
     void status() const;
+
+    void log() const;
+
+    bool checkout(
+        const std::string& commitID
+    );
 };

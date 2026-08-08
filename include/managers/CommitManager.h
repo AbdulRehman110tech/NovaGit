@@ -33,4 +33,8 @@ public:
     void displayCommit(
         const Commit& commit
     ) const;
+
+    Commit loadCommit(
+        const std::string& commitID
+    ) const;
 };

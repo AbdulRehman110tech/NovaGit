@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -14,10 +15,44 @@ namespace {
 
 constexpr char kCommitStoreDirectory[] = ".novagit/commits";
 
+constexpr char kCommitIDPrefix[] = "CommitID:";
+
+constexpr char kParentCommitIDPrefix[] = "ParentCommitID:";
+
+constexpr char kMessagePrefix[] = "Message:";
+
+constexpr char kTimestampPrefix[] = "Timestamp:";
+
+constexpr char kFilesLine[] = "Files:";
+
 std::string commitStorePath(
     const std::string& commitID
 ) {
     return std::string(kCommitStoreDirectory) + "/" + commitID;
+}
+
+std::string stripValuePrefix(
+    const std::string& line,
+    const std::string& prefix
+) {
+    if (line.compare(0, prefix.size(), prefix) != 0) {
+        return std::string{};
+    }
+
+    return line.substr(prefix.size());
+}
+
+BlobReference parseBlobReference(
+    const std::string& line
+) {
+    BlobReference reference;
+
+    std::istringstream stream(line);
+
+    stream >> reference.filename;
+    stream >> reference.blobHash;
+
+    return reference;
 }
 
 std::string buildCommitID(
@@ -118,4 +153,89 @@ void CommitManager::displayCommit(
     }
 
     std::cout << "----------------------------------------\n";
+}
+
+Commit CommitManager::loadCommit(
+    const std::string& commitID
+) const {
+    std::ifstream in(commitStorePath(commitID));
+
+    if (!in) {
+        return Commit{};
+    }
+
+    std::string loadedCommitID;
+    std::string parentCommitID;
+    std::string message;
+    std::time_t timestamp = 0;
+
+    std::vector<BlobReference> blobs;
+
+    bool readingFiles = false;
+
+    std::string line;
+
+    while (std::getline(in, line)) {
+        if (line.empty()) {
+            continue;
+        }
+
+        if (line == kFilesLine) {
+            readingFiles = true;
+            continue;
+        }
+
+        if (readingFiles) {
+            blobs.push_back(parseBlobReference(line));
+            continue;
+        }
+
+        const std::string commitIDValue = stripValuePrefix(
+            line,
+            kCommitIDPrefix
+        );
+
+        if (!commitIDValue.empty()) {
+            loadedCommitID = commitIDValue;
+            continue;
+        }
+
+        const std::string parentCommitIDValue = stripValuePrefix(
+            line,
+            kParentCommitIDPrefix
+        );
+
+        if (!parentCommitIDValue.empty()) {
+            parentCommitID = parentCommitIDValue;
+            continue;
+        }
+
+        const std::string messageValue = stripValuePrefix(
+            line,
+            kMessagePrefix
+        );
+
+        if (!messageValue.empty()) {
+            message = messageValue;
+            continue;
+        }
+
+        const std::string timestampValue = stripValuePrefix(
+            line,
+            kTimestampPrefix
+        );
+
+        if (!timestampValue.empty()) {
+            std::istringstream stream(timestampValue);
+            stream >> timestamp;
+        }
+    }
+
+    return Commit{
+        loadedCommitID,
+        parentCommitID,
+        blobs,
+        message,
+        timestamp
+    };
 }
